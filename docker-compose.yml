@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+    nginx:
+        build:
+            context: .
+            target: nginx
+        container_name: nginx-container
+        ports:
+            - '80:80'
+        volumes:
+            - ./:/home/www-data/task.local
+            - ./docker/nginx/site.conf:/etc/nginx/conf.d/default.conf
+        networks:
+            - code-network
+        depends_on:
+            - php
+
+    php:
+        build:
+            context: .
+            target: php
+            args:
+                USER_UID: ${USER_UID}
+        container_name: php-container
+        volumes:
+            - ./:/home/www-data/task.local
+        networks:
+            - code-network
+
+networks:
+    code-network:
+        driver: bridge
