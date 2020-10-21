@@ -1,15 +1,22 @@
 <?php
+namespace App;
 
+use SimpleXLSXGen;
+use Exception;
 
 class XlsExchange
 {
-    protected string $path_to_input_json_file;
-    protected string $path_to_output_xlsx_file;
-    protected string $ftp_host;
-    protected string $ftp_login;
-    protected string $ftp_password;
-    protected string $ftp_dir;
+    protected $path_to_input_json_file;
+    protected $path_to_output_xlsx_file;
+    protected $ftp_host;
+    protected $ftp_login;
+    protected $ftp_password;
+    protected $ftp_dir;
 
+    /*public function __construct($ftpHost, $ftpLogin, $ftpPassword, $ftpDir)
+    {
+
+    }*/
 
     /**
      * @param string $path

@@ -4,8 +4,7 @@ if (true === file_exists( __DIR__ . '/vendor/autoload.php' )) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
 
-require_once 'XlsExchange.php';
-
+use App\XlsExchange;
 
 try {
 
