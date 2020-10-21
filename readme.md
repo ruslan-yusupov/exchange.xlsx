@@ -1,4 +1,4 @@
-#Команды для запуска
+# Команды для запуска
 ```
 docker-compose up -d --build
 
@@ -6,12 +6,12 @@ docker-compose exec php composer install
 
 ```
 
-#Проверка работы в командной строке
+# Проверка работы в командной строке
 ```
 docker-compose exec php php -f index.php
 ```
 
-#Локальный домен
+# Локальный домен
 ```
 task.local
 ```
