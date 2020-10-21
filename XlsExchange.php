@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/vendor/autoload.php';
 
 
 class XlsExchange
@@ -10,15 +9,6 @@ class XlsExchange
     protected string $ftp_login;
     protected string $ftp_password;
     protected string $ftp_dir;
-
-    /**
-
-     ftp:
-     *
-     * host: ftp://bone018.timeweb.ru
-     * cu91437
-     * Y4UdLnehZSjL
-     */
 
 
     /**
@@ -69,32 +59,33 @@ class XlsExchange
 
 
     /**
-     * @return null
+     * @return bool
      */
-    public function export()
+    public function export(): bool
     {
         $data  = $this->jsonFileHandler( $this->path_to_input_json_file );
         $items = $this->getItems( $data );
 
-        $isExported = $this->exportToFtpServer( $items );
-
-        if (false === $isExported) {
-
-            $exportFileData = $items;
-
-            $headerTitles = [
-                'Id', 'ШК', 'Название', 'Кол-во', 'Сумма'
-            ];
-
-            array_unshift( $exportFileData, $headerTitles );
-
-            $xlsx = SimpleXLSXGen::fromArray( $exportFileData );
-
-            return $xlsx->saveAs( $this->path_to_output_xlsx_file );
+        if (empty( $items )) {
+            return false;
         }
 
-        return $isExported;
+        $exportFileData = $items;
+        $headerTitles = [
+            'Id', 'ШК', 'Название', 'Кол-во', 'Сумма'
+        ];
+
+        array_unshift( $exportFileData, $headerTitles );
+
+        $xlsxData = SimpleXLSXGen::fromArray( $exportFileData );
+
+        if (false === $this->exportToFtpServer( $xlsxData )) {
+            return $this->exportToLocalServer( $xlsxData );
+        }
+
+        return true;
     }
+
 
     /**
      * @param array $data
@@ -114,7 +105,7 @@ class XlsExchange
                 'barcode' => $item['item']['barcode'],
                 'name' => $item['item']['name'],
                 'amount' => $item['amount'],
-                'summ' => $item['amount'] * $item['price'],
+                'sum' => $item['amount'] * $item['price'],
 
             ];
 
@@ -173,22 +164,44 @@ class XlsExchange
 
     }
 
-    protected function exportToFtpServer(array $items): bool
+
+    /**
+     * @param SimpleXLSXGen $xlsxData
+     * @return bool
+     */
+    protected function exportToFtpServer(SimpleXLSXGen $xlsxData): bool
     {
 
-        //TODO exportToFtpServer
-        $file = "/home/user/myfile";
+        $xlsxString = $xlsxData->__toString();
+        $ftpFilePath = 'ftp://' . $this->ftp_login . ':' . $this->ftp_password . '@' . $this->ftp_host . '/' . $this->ftp_dir;
+        $streamOptions = [
+            'ftp' => [
+                'overwrite' => true
+            ]
+        ];
+        $streamContext = stream_context_create($streamOptions);
+        $filePointer = fopen( $ftpFilePath, 'wt', 0, $streamContext );
 
-        /* соединение с сервером */
-        $connId = ftp_connect($this->ftp_host);
-        $loginResult = ftp_login($connId, $this->ftp_login, $this->ftp_password);
-
-        if ($loginResult) {
-
-            ftp_put($connId, '/incoming/myfile', $file, FTP_BINARY);
+        if (false === $filePointer) {
+            return false;
         }
 
-        ftp_close($connId);
+        $isFileCreated = fwrite ( $filePointer, $xlsxString );
+        fclose ( $filePointer );
+
+        return $isFileCreated;
+
+    }
+
+
+    /**
+     * @param SimpleXLSXGen $xlsxData
+     * @return bool
+     */
+    protected function exportToLocalServer(SimpleXLSXGen $xlsxData): bool
+    {
+
+        return $xlsxData->saveAs( $this->path_to_output_xlsx_file );
 
     }
 
@@ -199,7 +212,9 @@ class XlsExchange
      */
     protected function jsonFileHandler(string $path)
     {
+
         return json_decode(file_get_contents($path), true);
+
     }
 
 }

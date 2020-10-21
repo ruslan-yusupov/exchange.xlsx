@@ -3,6 +3,8 @@
     "symfony/var-dumper": "^4.3"
   },
   "require": {
-    "shuchkin/simplexlsxgen": "^0.9.21"
+    "shuchkin/simplexlsxgen": "^0.9.21",
+    "ext-ftp": "*",
+    "ext-json": "*"
   }
 }
