@@ -13,10 +13,13 @@ class XlsExchange
     protected $ftp_password;
     protected $ftp_dir;
 
-    /*public function __construct($ftpHost, $ftpLogin, $ftpPassword, $ftpDir)
+    public function __construct($ftpHost = null, $ftpLogin = null, $ftpPassword = null, $ftpDir = null)
     {
-
-    }*/
+        $this->ftp_host = $ftpHost;
+        $this->ftp_login = $ftpLogin;
+        $this->ftp_password = $ftpPassword;
+        $this->ftp_dir = $ftpDir;
+    }
 
     /**
      * @param string $path
