@@ -1,3 +1,24 @@
+#Команды для запуска
+```
+docker-compose up -d --build
+
+docker-compose exec php composer install
+
+```
+
+#Проверка работы в командной строке
+```
+docker-compose exec php php -f index.php
+```
+
+#Локальный домен
+```
+task.local
+```
+
+
+
+
 # Задача
 
 Нужно взять данные из order.json и превратить их в формат items.xlsx.

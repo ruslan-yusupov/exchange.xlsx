@@ -13,13 +13,22 @@ class XlsExchange
     protected $ftp_password;
     protected $ftp_dir;
 
+
+    /**
+     * XlsExchange constructor.
+     * @param null $ftpHost
+     * @param null $ftpLogin
+     * @param null $ftpPassword
+     * @param null $ftpDir
+     */
     public function __construct($ftpHost = null, $ftpLogin = null, $ftpPassword = null, $ftpDir = null)
     {
-        $this->ftp_host = $ftpHost;
-        $this->ftp_login = $ftpLogin;
+        $this->ftp_host     = $ftpHost;
+        $this->ftp_login    = $ftpLogin;
         $this->ftp_password = $ftpPassword;
-        $this->ftp_dir = $ftpDir;
+        $this->ftp_dir      = $ftpDir;
     }
+
 
     /**
      * @param string $path
@@ -30,6 +39,10 @@ class XlsExchange
     {
         if (false === file_exists( $path )) {
             throw new Exception( 'Input file does not exist' );
+        }
+
+        if (false === is_readable( $path )) {
+            throw new Exception( 'Input file is not readable' );
         }
 
         $this->path_to_input_json_file = $path;
@@ -51,45 +64,36 @@ class XlsExchange
 
 
     /**
-     * @param string $host
-     * @param string $login
-     * @param string $password
-     * @param string $uploadDir
-     * @return $this
-     */
-    public function setFtpConnectionData(string $host, string $login, string $password, string $uploadDir): self
-    {
-        $this->ftp_host     = $host;
-        $this->ftp_login    = $login;
-        $this->ftp_password = $password;
-        $this->ftp_dir      = $uploadDir;
-
-        return $this;
-    }
-
-
-    /**
      * @return bool
      */
     public function export(): bool
     {
+        //Получение данных из файла
         $data  = $this->jsonFileHandler( $this->path_to_input_json_file );
-        $items = $this->getItems( $data );
+
+        //Подготовка данных для экспорта
+        $items = $this->prepareDataItems( $data );
 
         if (empty( $items )) {
             return false;
         }
 
         $exportFileData = $items;
+
+        //Названия столбцов для таблицы
         $headerTitles = [
             'Id', 'ШК', 'Название', 'Кол-во', 'Сумма'
         ];
 
         array_unshift( $exportFileData, $headerTitles );
 
+        //Преобразование подготовленных данных для выгрузки в xlsx
         $xlsxData = SimpleXLSXGen::fromArray( $exportFileData );
 
+        //Попытка выгрузить на удаленный сервер
         if (false === $this->exportToFtpServer( $xlsxData )) {
+
+            //Выгрузка на локальный сервер
             return $this->exportToLocalServer( $xlsxData );
         }
 
@@ -98,10 +102,20 @@ class XlsExchange
 
 
     /**
+     * @param string $path
+     * @return mixed
+     */
+    protected function jsonFileHandler(string $path)
+    {
+        return json_decode( file_get_contents( $path ), true) ;
+    }
+
+
+    /**
      * @param array $data
      * @return array
      */
-    protected function getItems(array $data): array
+    protected function prepareDataItems(array $data): array
     {
         $items = [];
 
@@ -119,7 +133,7 @@ class XlsExchange
 
             ];
 
-            if (false === $this->isValidBarcode( $item['barcode'] )) {
+            if (false === Barcode::isValid( $item['barcode'] )) {
                 continue;
             }
 
@@ -127,51 +141,6 @@ class XlsExchange
         }
 
         return $items;
-
-    }
-
-
-    /**
-     * @param string $barcode
-     * @return bool
-     */
-    protected function isValidBarcode(string $barcode): bool
-    {
-        $barcode = (string) $barcode;
-
-        if (!preg_match( "/^[0-9]+$/", $barcode )) {
-            return false;
-        }
-
-        if (13 !== strlen( $barcode )) {
-            return false;
-        }
-
-        //get check digit
-        $check    = substr( $barcode, -1 );
-        $barcode  = substr( $barcode, 0, -1 );
-        $sumEven = $sumOdd = 0;
-        $even     = true;
-
-        while(strlen( $barcode ) > 0) {
-
-            $digit = substr( $barcode, -1 );
-
-            if($even) {
-                $sumEven += 3 * $digit;
-            } else {
-                $sumOdd += $digit;
-            }
-
-            $even = !$even;
-            $barcode = substr( $barcode, 0, -1 );
-        }
-
-        $sum = $sumEven + $sumOdd;
-        $sumRoundedUp = ceil($sum/10) * 10;
-
-        return (floatval($check) == ($sumRoundedUp - $sum));
-
     }
 
 
@@ -181,7 +150,6 @@ class XlsExchange
      */
     protected function exportToFtpServer(SimpleXLSXGen $xlsxData): bool
     {
-
         $xlsxString = $xlsxData->__toString();
         $ftpFilePath = 'ftp://' . $this->ftp_login . ':' . $this->ftp_password . '@' . $this->ftp_host . '/' . $this->ftp_dir;
         $streamOptions = [
@@ -189,15 +157,15 @@ class XlsExchange
                 'overwrite' => true
             ]
         ];
-        $streamContext = stream_context_create($streamOptions);
-        $filePointer = fopen( $ftpFilePath, 'wt', 0, $streamContext );
+        $streamContext = stream_context_create( $streamOptions );
+        $filePointer = @fopen( $ftpFilePath, 'wt', 0, $streamContext );
 
         if (false === $filePointer) {
             return false;
         }
 
-        $isFileCreated = fwrite ( $filePointer, $xlsxString );
-        fclose ( $filePointer );
+        $isFileCreated = fwrite( $filePointer, $xlsxString );
+        fclose( $filePointer );
 
         return $isFileCreated;
 
@@ -210,21 +178,7 @@ class XlsExchange
      */
     protected function exportToLocalServer(SimpleXLSXGen $xlsxData): bool
     {
-
         return $xlsxData->saveAs( $this->path_to_output_xlsx_file );
-
-    }
-
-
-    /**
-     * @param string $path
-     * @return mixed
-     */
-    protected function jsonFileHandler(string $path)
-    {
-
-        return json_decode(file_get_contents($path), true);
-
     }
 
 }
