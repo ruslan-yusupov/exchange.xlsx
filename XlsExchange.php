@@ -11,6 +11,15 @@ class XlsExchange
     protected string $ftp_password;
     protected string $ftp_dir;
 
+    /**
+
+     ftp:
+     *
+     * host: ftp://bone018.timeweb.ru
+     * cu91437
+     * Y4UdLnehZSjL
+     */
+
 
     /**
      * @param string $path
@@ -19,8 +28,8 @@ class XlsExchange
      */
     public function setInputFile(string $path): self
     {
-        if (false === file_exists($path)) {
-            throw new Exception('Input file does not exist');
+        if (false === file_exists( $path )) {
+            throw new Exception( 'Input file does not exist' );
         }
 
         $this->path_to_input_json_file = $path;
@@ -54,78 +63,117 @@ class XlsExchange
         $this->ftp_login    = $login;
         $this->ftp_password = $password;
         $this->ftp_dir      = $uploadDir;
+
         return $this;
     }
 
 
     /**
-     * @return bool
+     * @return null
      */
-    public function export(): bool
+    public function export()
     {
-        $data = $this->jsonFileHandler($this->path_to_input_json_file);
+        $data  = $this->jsonFileHandler( $this->path_to_input_json_file );
+        $items = $this->getItems( $data );
 
-        if (!empty($data['items'])) {
+        $isExported = $this->exportToFtpServer( $items );
 
-            $items = [];
+        if (false === $isExported) {
 
-            foreach ($data['items'] as $item) {
-                $item = [
-                    'id' => $item['id'],
-                    'barcode' => $item['item']['barcode'],
-                    'name' => $item['item']['name'],
-                    'amount' => $item['amount'],
-                    'summ' => $item['amount'] * $item['price'],
+            $exportFileData = $items;
 
-                ];
+            $headerTitles = [
+                'Id', 'ШК', 'Название', 'Кол-во', 'Сумма'
+            ];
 
-                if (false === $this->isValidBarcode($item['barcode'])) {
-                    continue;
-                }
+            array_unshift( $exportFileData, $headerTitles );
 
-                $items[] = $item;
-            }
+            $xlsx = SimpleXLSXGen::fromArray( $exportFileData );
 
-
-
-            if (!empty($items)) {
-
-                $exportFileData = $items;
-
-                $headerTitles = [
-                    'Id', 'ШК', 'Название', 'Кол-во', 'Сумма'
-                ];
-
-                array_unshift($exportFileData, $headerTitles);
-
-                $xlsx = SimpleXLSXGen::fromArray( $exportFileData );
-
-                return $xlsx->saveAs('items.xlsx');
-
-            }
+            return $xlsx->saveAs( $this->path_to_output_xlsx_file );
         }
 
-        return false;
+        return $isExported;
     }
 
+    /**
+     * @param array $data
+     * @return array
+     */
     protected function getItems(array $data): array
     {
-        //TODO getItems
-        return [];
+        $items = [];
+
+        if (empty( $data['items'] )) {
+            return $items;
+        }
+
+        foreach ($data['items'] as $item) {
+            $item = [
+                'id' => $item['id'],
+                'barcode' => $item['item']['barcode'],
+                'name' => $item['item']['name'],
+                'amount' => $item['amount'],
+                'summ' => $item['amount'] * $item['price'],
+
+            ];
+
+            if (false === $this->isValidBarcode( $item['barcode'] )) {
+                continue;
+            }
+
+            $items[] = $item;
+        }
+
+        return $items;
 
     }
 
 
-
+    /**
+     * @param string $barcode
+     * @return bool
+     */
     protected function isValidBarcode(string $barcode): bool
     {
+        $barcode = (string) $barcode;
 
-        //TODO isValidBarcode
-        return true;
+        if (!preg_match( "/^[0-9]+$/", $barcode )) {
+            return false;
+        }
+
+        if (13 !== strlen( $barcode )) {
+            return false;
+        }
+
+        //get check digit
+        $check    = substr( $barcode, -1 );
+        $barcode  = substr( $barcode, 0, -1 );
+        $sumEven = $sumOdd = 0;
+        $even     = true;
+
+        while(strlen( $barcode ) > 0) {
+
+            $digit = substr( $barcode, -1 );
+
+            if($even) {
+                $sumEven += 3 * $digit;
+            } else {
+                $sumOdd += $digit;
+            }
+
+            $even = !$even;
+            $barcode = substr( $barcode, 0, -1 );
+        }
+
+        $sum = $sumEven + $sumOdd;
+        $sumRoundedUp = ceil($sum/10) * 10;
+
+        return (floatval($check) == ($sumRoundedUp - $sum));
 
     }
 
-    protected function exportToFtpServer()
+    protected function exportToFtpServer(array $items): bool
     {
 
         //TODO exportToFtpServer
